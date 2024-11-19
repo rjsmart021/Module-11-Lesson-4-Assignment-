@@ -1,59 +1,91 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-import { FormGroup, ControlLabel, FormControl, Form } from 'react-bootstrap';
-import './style.css';
+import './App.css';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import md5 from 'md5';
 
-class SortByName extends Component {
-  state = {
-    sort: '',
-    perPage: 20,
-  };
+// API keys and configuration
+const publicKey = import.meta.env.VITE_PUBLIC_KEY;
+const privateKey = import.meta.env.VITE_PRIVATE_KEY;
+const timestamp = Date.now();
+const hash = md5(timestamp + privateKey + publicKey);
 
-  changeSort = (event) => {
-    this.setState({ sort: event.target.value });
-    this.props.onChangeSort(event);
-  }
+// Marvel heroes to fetch
+const characterList = [
+    "Iron Man",
+    "Thor",
+    "Captain America",
+    "Black Panther",
+    "Doctor Strange",
+    "Hulk",
+    "Magneto",
+    "Wolverine",
+    "Daredevil"
+];
 
-  changePerPage = (event) => {
-    this.setState({ perPage: event.target.value });
-    this.props.onChangeLimit(event);
-  }
+const MarvelCharacters = () => {
+    const [characters, setCharacters] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  render() {
+    useEffect(() => {
+      const fetchCharacters = async () => {
+        try {
+          const responses = await Promise.all(
+            characterList.map(hero => 
+              axios.get(`https://gateway.marvel.com/v1/public/characters`, {
+                params: {
+                  ts: timestamp,
+                  apikey: publicKey,
+                  hash: hash,
+                  name: hero
+                }
+              })
+            )
+          );
+          const data = responses.map(response => {
+            if (response.data && response.data.data.results.length > 0) {
+              return response.data.data.results[0];
+            } else {
+              return null;
+            }
+          }).filter(Boolean); // Filters out any null values
+  
+          setCharacters(data);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error fetching data:', err.response ? err.response.data : err.message);
+          setError(err);
+          setLoading(false);
+        }
+      };
+  
+      fetchCharacters();
+    }, []);
+  
+    if (loading) return <p>Loading...</p>;
+    if (error) return <p>Error: {error.message}</p>;
+  
     return (
-      <div className="SortByName">
-        <Form inline className="SortByName-form">
-          <FormGroup controlId="sortByName">
-            <ControlLabel>Sorting by Name</ControlLabel>{' '}
-            <FormControl componentClass="select" value={this.state.sort} onChange={this.changeSort}>
-              <option value="">Asc.</option>
-              <option value="-">Desc</option>
-            </FormControl>
-          </FormGroup>
-          <span className="hidden-xs"> - </span>
-          <FormGroup controlId="resultsPerPage">
-            <ControlLabel>Results per page</ControlLabel>{' '}
-            <FormControl componentClass="select" value={this.state.perPage} onChange={this.changePerPage}>
-              <option value={20}>20</option>
-              <option value={40}>40</option>
-              <option value={60}>60</option>
-              <option value={100}>100</option>
-            </FormControl>{' '}
-          </FormGroup>
-        </Form>
+      <div className="container">
+        <h1 className="h1">Marvel Characters</h1>
+        <div className="grid">
+          {characters.map(character => (
+            character && (
+              <div className="grid-item" key={character.id}>
+                <div className="text-container">
+                  <h2 className="h2">{character.name}</h2>
+                </div>
+                <img className="img"
+                  src={`${character.thumbnail.path}.${character.thumbnail.extension}`} 
+                  alt={character.name} 
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )
+          ))}
+        </div>
       </div>
     );
-  }
-}
-
-SortByName.PropTypes = {
-  onChangeSort: PropTypes.func,
-  onChangeLimit: PropTypes.func,
 };
 
-SortByName.defaultProps = {
-  onChangeSort: () => console.warn('Component onChangeSort not defined.'),
-  onChangeLimit: () => console.warn('Component onChangeLimit not defined.'),
-};
-
-export default SortByName;
+export default MarvelCharacters;
